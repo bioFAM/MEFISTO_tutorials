@@ -90,7 +90,7 @@ MOFAobject_untrained <- prepare_mofa(
 
 **Train the MOFA model**
 Now, we are ready to train the model.
-```{r, echo=FALSE}
+```{r}
 outfile <- "data/evodevo_model.hdf5"
 # MOFAobject <- run_mofa(MOFAobject_untrained, outfile = outfile)
 ```
