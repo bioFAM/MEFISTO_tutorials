@@ -25,6 +25,11 @@ library(reshape2)
 
 
 # Load data
+The data for this vignette can be downloaded from [here](https://figshare.com/s/242916198fde3353f3e6) and placed in a `data/` directory. You should then have two files:
+
+- `data/evodevo.RData` containing the expression data used as input
+- `data/evodevo_model.hdf5` containing the pre-trained MEFISTO model
+
 We first load the dataframe that contains the gene expression data for all organs (views) and species (groups) as well as the (unmatched) time annotation for each sample.
 ```{r load_data}
 load("data/evodevo.RData")
