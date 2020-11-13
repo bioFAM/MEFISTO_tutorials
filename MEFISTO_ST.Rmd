@@ -1,0 +1,143 @@
+---
+title: "MEFISTO application to spatial transcriptomics data"
+author:
+- name: "Britta Velten"
+  affiliation: "German Cancer Research Center, Heidelberg, Germany"
+  email: "b.velten@dkfz-heidelberg.de"
+date: "`r Sys.Date()`"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{MEFISTO on spatial transcriptomics data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+```{r, warning=FALSE, message=FALSE}
+library(MOFA2)
+library(tidyverse)
+library(cowplot)
+library(magrittr)
+```
+
+# Load ST data set
+We use the example data provided in the [Seurat vignette](https://satijalab.org/seurat/v3.2/spatial_vignette.html), which contains spatial transcriptomics data on a slide of a mouse brain tissue generated using 10x visium.
+
+```{r}
+library(Seurat)
+SeuratData::InstallData("stxBrain")
+brain <- SeuratData::LoadData("stxBrain", type = "anterior1")
+brain <- Seurat::NormalizeData(brain, assay = "Spatial", verbose = FALSE)
+brain <- Seurat::FindVariableFeatures(brain, assay = "Spatial")
+```
+
+# Preprocess data for MEFISTO
+Next, we prepare the data for input to MEFISTO. For this we need the expression data  (using the 2000 top variable features) as well as the spatial coordinates of each sample (spot).
+```{r}
+expression_data <- as.matrix(brain@assays$Spatial@data[VariableFeatures(brain),])
+
+dim(expression_data)
+```
+```{r}
+locs <- GetTissueCoordinates(brain)
+locs <- tibble::rownames_to_column(locs, "sample") %>%
+  gather(key = "covariate", value = "value", starts_with("image"))
+
+head(locs %>% arrange(sample))
+```
+
+# Create a MOFA object specifying spatial coordinates as covariates
+To create a space-aware MOFA model (= MEFISTO) we provide MOFA the expression data as well as the spatial coordinates in `set_covariates`.
+```{r}
+# create MOFA objects and specify the spatial coordinates as covariates
+sm <- create_mofa(data = list(RNA = expression_data))
+sm <- set_covariates(sm, locs)
+```
+
+# Prepare training
+Before training, we can specify various options for the model, the training and the data pre-processing. If no options are specified, the model will use the default options. See also `get_default_data_options`, `get_default_model_options`, `get_default_training_options` and `get_default_smooth_options` to have a look at the various options and their defaults. Here, we in particular, specify that we want to use spare Gaussian process with a smaller number of inducing points which can speed up training.
+```{r}
+model_opts <- get_default_model_options(sm)
+model_opts$num_factors <- 4
+
+n_inducing <- 1000 # We use 1000 inducing points to learn spatial covariance patterns
+smooth_opts <- get_default_smooth_options(sm)
+smooth_opts$sparseGP <- TRUE
+smooth_opts$frac_inducing <- n_inducing / get_dimensions(sm)$N
+
+train_opts <- get_default_training_options(sm)
+train_opts$seed <- 2021
+
+sm <- prepare_mofa(sm, training_options = train_opts,
+                   model_options = model_opts,
+                   smooth_options = smooth_opts)
+```
+
+
+```{r}
+outfile = "data/ST_model.hdf5"
+```
+
+Next, we train the model. As running the model can take some time, we here load a pre-trained model.
+```{r, eval = FALSE}
+# sm <- run_mofa(sm, outfile = outfile)
+```
+
+# Load a trained model
+```{r, warning=FALSE}
+sm <- load_model(outfile)
+```
+
+```{r, echo = FALSE}
+# as the model was trained without names we add feature names back on trained model
+# this is not required if the model was trained with names or from R with the run_mofa function. 
+features_names(sm) <- list(rownames(expression_data))
+```
+
+
+# Downstream analyses
+## Variance decomposition
+First, we can take a look whether our factor are uncorrelated.
+```{r, fig.height=3, fig.width=3}
+plot_factor_cor(sm)
+```
+
+## Spatial factors
+Next, we will have a look at the spatial patterns that are captured by each factor. 
+We here rotate the tissue to obtain the same as orientation as in `SpatialFeaturePlot` below.
+
+```{r, fig.width=18, fig.height=4}
+plot_factors_vs_cov(sm, rotate_y = TRUE)
+```
+
+## Smoothness of factors
+All of this factors seem to capture spatial patterns of variation that seems to vary smoothly along space to some extent. We can take a look at the smoothness score inferred by the model.
+```{r, fig.height=0.5, fig.width=7}
+plot_smoothness(sm)
+```
+
+## Weights
+To inspect which genes underly these spatial patterns, we can take a look at the top weights per factor. For example, Factor 4 highlights Ttr, a marker of the choroid plexus.
+```{r, fig.width=3, fig.height=4}
+plot_top_weights(sm, factors = 4)
+```
+
+To explore the expression patterns of these genes that are highlighted on the weights by MEFISTO, we can use Seurat's `SpatialFeaturePlot`.
+```{r}
+W <- get_weights(sm)[[1]]
+top_weights <- rownames(W)[apply(abs(W), 2, which.max )]
+list_seurat <- SpatialFeaturePlot(brain, features = top_weights,
+                                combine = F)
+gg_seurat <- plot_grid(plotlist = list_seurat, nrow = 1)
+gg_seurat
+```
+
+
+# SessionInfo
+```{r}
+sessionInfo()
+```
+
