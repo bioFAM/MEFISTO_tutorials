@@ -77,11 +77,11 @@ sm <- prepare_mofa(sm, training_options = train_opts,
 ```
 
 
+Next, we train the model. As running the model can take some time, we here load a pre-trained model. This can be found [here](https://figshare.com/s/242916198fde3353f3e6).
 ```{r}
 outfile = "data/ST_model.hdf5"
 ```
 
-Next, we train the model. As running the model can take some time, we here load a pre-trained model.
 ```{r, eval = FALSE}
 # sm <- run_mofa(sm, outfile = outfile)
 ```
@@ -92,7 +92,7 @@ sm <- load_model(outfile)
 ```
 
 ```{r, echo = FALSE}
-# as the model was trained without names we add feature names back on trained model
+# as the model was trained without names we add feature names back on the trained model
 # this is not required if the model was trained with names or from R with the run_mofa function. 
 features_names(sm) <- list(rownames(expression_data))
 ```
