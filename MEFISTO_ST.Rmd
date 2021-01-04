@@ -58,22 +58,22 @@ sm <- set_covariates(sm, locs)
 ```
 
 # Prepare training
-Before training, we can specify various options for the model, the training and the data pre-processing. If no options are specified, the model will use the default options. See also `get_default_data_options`, `get_default_model_options`, `get_default_training_options` and `get_default_smooth_options` to have a look at the various options and their defaults. Here, we in particular, specify that we want to use spare Gaussian process with a smaller number of inducing points which can speed up training.
+Before training, we can specify various options for the model, the training and the data pre-processing. If no options are specified, the model will use the default options. See also `get_default_data_options`, `get_default_model_options`, `get_default_training_options` and `get_default_mefisto_options` to have a look at the various options and their defaults. Here, we in particular, specify that we want to use spare Gaussian process with a smaller number of inducing points which can speed up training.
 ```{r}
 model_opts <- get_default_model_options(sm)
 model_opts$num_factors <- 4
 
 n_inducing <- 1000 # We use 1000 inducing points to learn spatial covariance patterns
-smooth_opts <- get_default_smooth_options(sm)
-smooth_opts$sparseGP <- TRUE
-smooth_opts$frac_inducing <- n_inducing / get_dimensions(sm)$N
+mefisto_opts <- get_default_mefisto_options(sm)
+mefisto_opts$sparseGP <- TRUE
+mefisto_opts$frac_inducing <- n_inducing / get_dimensions(sm)$N
 
 train_opts <- get_default_training_options(sm)
 train_opts$seed <- 2021
 
 sm <- prepare_mofa(sm, training_options = train_opts,
                    model_options = model_opts,
-                   smooth_options = smooth_opts)
+                   mefisto_options = mefisto_opts)
 ```
 
 

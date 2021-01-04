@@ -65,7 +65,7 @@ gg_input
 **Prepare the MOFA object**
 Next, we prepare the model for training. For this we specify the different  options. Similar to the standard MOFA workflow we define data, model and training options. Take a look at `get_default_data_options`, `get_default_model_options` and `get_default_training_options` to see what options can be specified. Here, we specify that we want to use 5 factors and set a seed for reproducibility. 
 
-In addition, for MEFISTO we can specify smooth options, see `get_default_smooth_options`. Here, we specify that we want to align the times across species using Mouse as a reference group. Furthermore, we can optionally specify time points (when using warping these correspond to times in the reference group), for which to interpolate the factors in all groups.
+In addition, for MEFISTO we can specify MEFISTO-specific options, see `get_default_mefisto_options`. Here, we specify that we want to align the times across species using Mouse as a reference group. Furthermore, we can optionally specify time points (when using warping these correspond to times in the reference group), for which to interpolate the factors in all groups.
 ```{r MOFA_options}
 data_opts <- get_default_data_options(MOFAobject_untrained)
 
@@ -76,10 +76,10 @@ train_opts <- get_default_training_options(MOFAobject_untrained)
 train_opts$seed <- 2020
 train_opts$convergence_mode <- "medium" # use "fast" for faster training
 
-smooth_opts <- get_default_smooth_options(MOFAobject_untrained)
-smooth_opts$warping <- TRUE
-smooth_opts$warping_ref <- "Mouse"
-smooth_opts$new_values <- 1:14 
+mefisto_opts <- get_default_mefisto_options(MOFAobject_untrained)
+mefisto_opts$warping <- TRUE
+mefisto_opts$warping_ref <- "Mouse"
+mefisto_opts$new_values <- 1:14 
 ```
 
 We then pass all these options to the object.
@@ -89,7 +89,7 @@ MOFAobject_untrained <- prepare_mofa(
   data_options = data_opts,
   model_options = model_opts,
   training_options = train_opts,
-  smooth_options = smooth_opts
+  mefisto_options = mefisto_opts
 ) 
 ```
 
@@ -135,7 +135,7 @@ Using the underlying Gaussian process for each factor we can interpolate to unse
 ```{r}
 plot_interpolation_vs_covariate(MOFAobject, only_mean = FALSE)
 
-# if the interpolation was not specified in smooth_options before training
+# if the interpolation was not specified in mefisto_options before training
 # or you want to interpolate to new values you can use interpolate_factors
 # this however does not provide uncertainties
 MOFAobject_new <- interpolate_factors(MOFAobject,

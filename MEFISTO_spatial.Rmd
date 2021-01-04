@@ -77,20 +77,23 @@ We now successfully created a MOFA object that contains 4 views, 1 group and 2 c
 ## Prepare a MOFA object
 Before training, we can specify various options for the model, the training and the data preprocessing. If no options are specified, the model will use the default options. See also `get_default_data_options`, `get_default_model_options` and `get_default_training_options` to have a look at the defaults and change them where required. For illustration pruposes, we only use a small number of training iterations.
 
-Importantly, to activate the use of the covariate for a functional decomposition (MEFISTO) we now need to specify `smooth_options` in addition to the standard MOFA options. For this you can just use the default options (`get_default_smooth_options`), unless you want to make use of advanced options such as alignment across groups.
+Importantly, to activate the use of the covariate for a functional decomposition (MEFISTO) we now need to specify `mefisto_options` in addition to the standard MOFA options. For this you can just use the default options (`get_default_mefisto_options`), unless you want to make use of advanced options such as alignment across groups.
 
 ```{r, message=FALSE, warning=FALSE}
+data_opts <- get_default_data_options(sm)
+
 model_opts <- get_default_model_options(sm)
 model_opts$num_factors <- 4
 
 train_opts <- get_default_training_options(sm)
 train_opts$maxiter <- 100
 
-smooth_opts <- get_default_smooth_options(sm)
+mefisto_opts <- get_default_mefisto_options(sm)
 
 sm <- prepare_mofa(sm, model_options = model_opts,
-                   smooth_options = smooth_opts,
-                   training_options = train_opts)
+                   mefisto_options = mefisto_opts,
+                   training_options = train_opts,
+                   data_options = data_opts)
 ```
 
 
