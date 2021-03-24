@@ -1,0 +1,288 @@
+---
+title: "MEFISTO application to longitudinal microbiome data"
+author:
+- name: "Britta Velten"
+  affiliation: "German Cancer Research Center, Heidelberg, Germany"
+  email: "b.velten@dkfz-heidelberg.de"
+date: "`r Sys.Date()`"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{MEFISTO on evodevo data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(MOFA2)
+library(reshape2)
+library(cowplot)
+library(magrittr)
+
+cols4diet <- c("#1f78b4", "#b2df8a")
+names(cols4diet) <- c("fd", "bd")
+
+cols4delivery <- c("#e6ab02", "#d95f02")
+names(cols4delivery) <- c("Cesarean", "Vaginal")
+```
+
+# Load data
+The data for this vignette can be downloaded from [here](https://figshare.com/s/242916198fde3353f3e6) and placed in a `data/` directory. You should then have the following files:
+
+- `data/microbiome_data.csv` containing the microbiome data used as input
+- `data/microbiome_features_metadata.csv` containing taxonomic information for the features in the model
+- `data/microbiome_model.hdf5` containing the pre-trained MEFISTO model
+
+Note that the data used in this vignette slightly differs from the [preprint on MEFISTO](https://www.biorxiv.org/content/10.1101/2020.11.03.366674v1?rss=1).
+We first load the dataframe that contains the preprocessed microbiome data for all children (groups) as well as the time annotation (month of life) for each sample.
+
+```{r load_data}
+microbiome <- read.csv("data/microbiome_data.csv")
+head(microbiome)
+
+feature_meta <- read.csv("data/microbiome_features_metadata.csv")
+head(feature_meta)
+```
+
+# Prepare and train MOFA
+*Create the MOFA object*
+
+First, we need to create a MOFA object from this data. This step is analogous to use of MOFA without the time information and can be done using `create_mofa`, which results in an untrained MOFA object.
+```{r, message=FALSE, warning=FALSE}
+# create the MOFA object and add times as covariate
+MOFAobject_untrained <- create_mofa(data = microbiome)
+MOFAobject_untrained
+```
+
+Next, we want to add the time information for each sample, which we can do using `set_covariates`. As the information on the month for each sample is already contained in the data.frame that we passed to the MOFAobject in `create_mofa`, we can just specify to use this column as covariate. Alternatively, we could also supply a new matrix or data frame providing the sample names and covariates. See `?set_covariates`. 
+```{r}
+head(samples_metadata(MOFAobject_untrained))
+MOFAobject_untrained <- set_covariates(MOFAobject_untrained,
+                                       covariates = "month")
+MOFAobject_untrained
+```
+
+**Show data and time covariate**
+Before moving towards the training, let's first take a look at the data in the untrained object. The plot shows for children (groups) which time points are available. Note that there are many missing time points for several children in this data.
+```{r data_overview, fig.width= 15, fig.height=2}
+gg_input <- plot_data_overview(MOFAobject_untrained,
+                               show_covariate = FALSE,
+                               show_dimensions = FALSE) 
+gg_input
+```
+
+
+**Prepare the MOFA object**
+Next, we prepare the model for training. For this we specify the different  options. Similar to the standard MOFA workflow we define data, model and training options. Take a look at `get_default_data_options`, `get_default_model_options` and `get_default_training_options` to see what options can be specified. Here, we specify that we want to use 2 factors and set a seed for reproducibility. In addition we do not center the data from individual groups as the data was already centered across all samples. This can be preferably if differences between groups should be maintained and the feature levels are comparable between groups.
+
+In addition, for MEFISTO we can specify MEFISTO-specific options, see `get_default_mefisto_options`. Here, we specify the optimisation frequency and number of grid points which can speed up inference. For a fast inference, we could also specify to not model inter-group relationships which can be slow in the presence of many groups.
+```{r MOFA_options}
+data_opts <- get_default_data_options(MOFAobject_untrained)
+data_opts$center_groups <- FALSE
+
+model_opts <- get_default_model_options(MOFAobject_untrained)
+model_opts$num_factors <- 2
+
+mefisto_opts <- get_default_mefisto_options(MOFAobject_untrained)
+mefisto_opts$n_grid <- 10
+mefisto_opts$start_opt <- 50
+mefisto_opts$opt_freq <- 50
+# mefisto_opts$model_groups <- FALSE
+
+train_opts <- get_default_training_options(MOFAobject_untrained)
+train_opts$seed <- 2020
+```
+
+We then pass all these options to the object.
+```{r prepare_MOFA, message = FALSE}
+MOFAobject_untrained <- prepare_mofa(
+  object = MOFAobject_untrained,
+  data_options = data_opts,
+  model_options = model_opts,
+  training_options = train_opts,
+  mefisto_options = mefisto_opts
+) 
+```
+
+**Train the MOFA model**
+Now, we are ready to train the model.
+```{r}
+outfile <- "data/microbiome_model.hdf5"
+# MOFAobject <- run_mofa(MOFAobject_untrained, outfile = outfile)
+```
+
+For all further analysis we will use a pre-trained model. In addition to the factor values at the observed data points we can optionally load the interpolated data.
+```{r load_model, warning = FALSE}
+MOFAobject <- load_model(outfile, load_interpol_Z = TRUE)
+```
+
+The pretrained object does not yet contain the samples meta information, so we add this and the information on the taxonomy of the features to the model's metadata and use more readable feature names based on the taxonomy.
+```{r}
+samples_metadata(MOFAobject) <- left_join(samples_metadata(MOFAobject),
+                                          samples_metadata(MOFAobject_untrained),
+                                          by = c("sample", "group","month"))
+
+features_metadata(MOFAobject) <- features_metadata(MOFAobject) %>%
+  left_join(feature_meta, by = c("feature" = "SampleID")) %>%
+  separate(col = Taxon, sep = ";",
+           into = c("kingdom", "phylum", "class",
+                    "order", "family", "genus", "species"),
+           remove = FALSE)
+```
+
+# Factor overview and visualization
+## Variance decomposition and factor correlation
+To obtain a first overview of the factors we can take a look at the variance that a factor explains in each child.
+```{r variance_decomposition}
+p <- plot_variance_explained(MOFAobject, plot_total = T, x = "group", split_by = "view")
+p[[1]] + theme(axis.text.x = element_blank()) + xlab("child")
+p[[2]] + theme(axis.text.x = element_blank()) + xlab("child")
+```
+
+## Factors versus month of life
+To investigate the inferred factors, we can plot them against the months of life and colour them by the metadata of the samples. Here, we color by delivery mode and diet.
+```{r}
+# Factor 1 coloured by delivery
+plot_factors_vs_cov(MOFAobject, color_by = "delivery", factor = 1) +
+  scale_fill_manual(values = cols4delivery) +
+  stat_summary(aes(col = color_by), geom="line", fun.y = "mean") +
+  scale_color_manual(values = cols4delivery)
+
+# Factor 2 coloured by diet
+plot_factors_vs_cov(MOFAobject, color_by = "diet", factor = 2) +
+  scale_fill_manual(values = cols4diet) +
+  stat_summary(aes(col = color_by), geom="line", fun.y = "mean") +
+  scale_color_manual(values = cols4diet)
+```
+
+## Interpolation
+Using the underlying Gaussian process for each factor we can interpolate to unseen time points for children that are missing data in these time points and intermediate time points. If you want to show uncertainties, set only_mean to FALSE. Note that these are only available if the new values for interpolation have been specified before training.
+
+```{r, fig.width=12, fig.height=12}
+plot_interpolation_vs_covariate(MOFAobject,
+                                only_mean = FALSE, factor = 1) +
+  facet_wrap(~group)
+
+plot_interpolation_vs_covariate(MOFAobject,
+                                only_mean = FALSE, factor = 2) +
+  facet_wrap(~group)
+```
+
+## Scatterplot
+We can also look at the factor values on the sample level.
+Here each dot correspond to one time-point-child combination.
+```{r scatter, fig.width=9, fig.height=3.5}
+gg_scatter <- plot_grid(
+plot_factors(MOFAobject, color_by = "delivery") +
+  theme(legend.position = "top") +
+  scale_fill_manual(values = cols4delivery),
+plot_factors(MOFAobject, color_by = "diet") +
+  theme(legend.position = "top") +
+  scale_fill_manual(values = cols4diet),
+plot_factors(MOFAobject, color_by = "month") +
+  theme(legend.position = "top"),
+nrow = 1, align = "h", axis = "tb")
+
+gg_scatter
+```
+
+# Factor weights
+Next we have a look at the microbial species associated with the factors, focusing on Factor 1.
+For this we have a look at the weights of the factor.
+
+## Individual species
+Let's first have a look at the top positive and top negative species on factor 1. We find top negative weights for species of the genera Bacteroides and Faecalibacterium, meaning that their abundance varies in line with the negative of Factor 1, increasing over the first year of life and with higher abundance in vaginally delivered children. 
+```{r top_weights}
+# top negative ones (more dominant in vaginal)
+get_weights(MOFAobject, factors = 1, as.data.frame = TRUE) %>%
+  arrange(value) %>% head(20) %>%
+  left_join(., features_metadata(MOFAobject), by = c("feature", "view")) %>%
+  select(feature, family, genus, species, value) 
+
+# top positive ones  (more dominant in C-section)
+get_weights(MOFAobject, factors = 1, as.data.frame = TRUE) %>%
+  arrange(-value) %>% head(20) %>%
+  left_join(., features_metadata(MOFAobject), by = c("feature", "view")) %>%
+  select(feature, family, genus, species, value) 
+```
+
+We can also take a look at the data for the top features on the factor:
+```{r data_vs_time}
+plot_data_vs_cov(MOFAobject, features = 3,
+                 color_by = "delivery") + 
+  scale_fill_manual(values = cols4delivery)
+```
+
+## Aggregation to genus level
+We now aggregate the weights on the genus level.
+```{r weights_genera}
+df_weights1 <- get_weights(MOFAobject, as.data.frame = T, factors = 1) %>%
+  left_join(., features_metadata(MOFAobject), by = c("feature", "view"))
+
+# filter out genera with missing genera information and shorten name
+df_weights1 %<>% filter(!is.na(genus), genus != "g__")
+df_weights1 %<>% mutate(genus = gsub("g__","", genus))
+df_weights1 %<>% mutate(genus = ifelse(genus == " Pseudoramibacter_Eubacterium",
+                                       "Pseudoramibacter_Eub.", genus))
+df_weights1 %<>% mutate(genus = gsub("\\[","", genus))
+df_weights1 %<>% mutate(genus = gsub("\\]","", genus))
+
+# summarize by mean weights across all species in the genus and 
+# filter to top 10 positive and negative ones
+df_top <- df_weights1 %>% group_by(genus) %>% 
+  summarize(mean_weight = mean(value), n_spec = n()) %>%
+  ungroup() %>% filter(n_spec > 2) %>%
+  # cesarean is linked to higher latent values
+  mutate(type = ifelse(mean_weight > 0, "Cesarean", "Vaginal")) %>%
+  group_by(type) %>%
+  slice_max(abs(mean_weight), n= 5) %>% ungroup() %>% arrange(mean_weight) %>%
+  mutate(genus = factor(genus, levels = .$genus))
+
+# plot
+df_top %>% 
+  ggplot(aes(x= genus, y = mean_weight, fill = type)) + geom_bar(stat="identity") +
+  coord_flip() + theme_bw()  + scale_fill_manual(values = cols4delivery) +
+  theme(legend.position = "top") + xlab("") + guides(fill = guide_legend(title="")) +
+  geom_point(data = filter(df_weights1, genus %in% df_top$genus),
+             aes(x = genus, y = value), inherit.aes = FALSE, alpha = 0.3)  +
+  ylab("Weight (Factor 1)")
+```
+
+# Smoothness and sharedness of factors: Investigating the learnt hyper parameters
+In addition to the factor values and the alignment the model also inferred an underlying Gaussian process that generated these values. By looking into it we can extract information on the smoothness of each factor, i.e. how smoothly it varies over the months, as well as the sharedness of each factor, i.e. how much the children (groups) show the same underlying pattern. 
+
+## Smoothness score
+The scale  parameters of the Gaussian process capture the smoothness of the model. A scale of 1 indicates high smoothness, a scale of 0 variation independent of time. Here all factors show some but a rather low smoothness, indicating that there is a lot of noise and non-temporal variation in both factors.
+```{r}
+get_scales(MOFAobject)
+```
+
+For visualization we visualize the scale of the Gaussian process as a smoothness score in a barplot for each factor. No color indicates no smoothness, a fully colored bar a very smooth factor.
+```{r smooth, fig.height=0.5, fig.width=5}
+plot_smoothness(MOFAobject) 
+```
+
+## Sharedness
+The group kernel of the Gaussian process can give us insights into the extent to which a temporal pattern captured on a factor is shared across children. 
+```{r, fig.width=12}
+plot_group_kernel(MOFAobject, factors = "all",
+                  cellheight =  5, cellwidth = 5,
+                  treeheight_col = 3, treeheight_row = 3)
+```
+
+For visualization we calculate an overall sharedness score per factor between 0 and 1. No color indicates no sharedness, a fully colored bar a fully shared factor.
+```{r shared, fig.height=0.5, fig.width=5}
+plot_sharedness(MOFAobject) 
+```
+
+
+<details>
+  <summary>**Session Info**</summary>
+  
+```{r}
+sessionInfo()
+```
+
+</details>
