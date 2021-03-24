@@ -35,6 +35,7 @@ The data for this vignette can be downloaded from [here](https://figshare.com/s/
 - `data/microbiome_features_metadata.csv` containing taxonomic information for the features in the model
 - `data/microbiome_model.hdf5` containing the pre-trained MEFISTO model
 
+The original data was published by [Bokulich et al](https://stm.sciencemag.org/content/8/343/343ra82).
 Note that the data used in this vignette slightly differs from the [preprint on MEFISTO](https://www.biorxiv.org/content/10.1101/2020.11.03.366674v1?rss=1).
 We first load the dataframe that contains the preprocessed microbiome data for all children (groups) as well as the time annotation (month of life) for each sample.
 
