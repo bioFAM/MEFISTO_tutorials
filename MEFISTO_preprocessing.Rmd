@@ -1,5 +1,5 @@
 ---
-title: "Notes on data pre-processing for hte use of MEFISTO"
+title: "Notes on data pre-processing for the use of MEFISTO"
 author:
 - name: "Britta Velten"
   affiliation: "German Cancer Research Center, Heidelberg, Germany"
