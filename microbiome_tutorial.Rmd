@@ -90,7 +90,8 @@ mefisto_opts <- get_default_mefisto_options(MOFAobject_untrained)
 mefisto_opts$n_grid <- 10
 mefisto_opts$start_opt <- 50
 mefisto_opts$opt_freq <- 50
-# mefisto_opts$model_groups <- FALSE
+# mefisto_opts$model_groups <- FALSE # fast option (no optimization of group relationships) 
+mefisto_opts$new_values <- matrix(0:24, nrow =1) # set time points to interpolate factors to
 
 train_opts <- get_default_training_options(MOFAobject_untrained)
 train_opts$seed <- 2020
