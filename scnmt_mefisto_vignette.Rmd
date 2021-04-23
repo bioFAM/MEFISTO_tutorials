@@ -60,10 +60,12 @@ celltype.colors <- c(
 
 # Load data
 
+Data is available for download [here](https://figshare.com/s/242916198fde3353f3e6)
+
 The input data consists of three modalities: RNA expression quantified over genes; and DNA methylation and chromatin accessibility quantified over TF motifs. The script to do this step can be found [here](https://github.com/rargelaguet/scnmt_gastrulation/tree/develop/metacc/quantify_feature_level/motifs). Then, it is just a matter of doing some feature selection and preparing the input data for MEFISTO. The script for this step can be found [here](https://github.com/bioFAM/MEFISTO_analyses/blob/master/scnmt/load_data.R). For the purpose of this vignette we will load the multi-omics data already processed in a long data.table format
 
 ```{r}
-data <- fread("/Users/ricard/data/gastrulation/metaccrna/mefisto/vignette/data.txt.gz")
+data <- fread("/Users/ricard/data/gastrulation/metaccrna/mefisto/vignette/scnmt_data.txt.gz")
 head(data,n=3)
 ```
 
@@ -74,7 +76,7 @@ data[,length(unique(feature)),by="view"]
 
 Load cell metadata
 ```{r}
-sample_metadata <- fread("/Users/ricard/data/gastrulation/metaccrna/mefisto/vignette/sample_metadata.txt")
+sample_metadata <- fread("/Users/ricard/data/gastrulation/metaccrna/mefisto/vignette/scnmt_sample_metadata.txt")
 colnames(sample_metadata)
 ```
 
@@ -145,7 +147,7 @@ mefisto <- run_mofa(mefisto)
 
 For reprodudicibility purposes, we also provide the precomputed MEFISTO model that we used for the manuscript:
 ```{r}
-mefisto <- readRDS("/Users/ricard/data/gastrulation/metaccrna/mefisto/mefisto_model_motifs_v2.rds")
+mefisto <- readRDS("/Users/ricard/data/gastrulation/metaccrna/mefisto/vignette/scnmt_mefisto_model.rds")
 ```
 
 Select factors that explain at least 1% of variance in the RNA expression
