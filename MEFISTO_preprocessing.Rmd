@@ -32,7 +32,7 @@ dds <- makeExampleDESeqDataSet()
 dds <- estimateSizeFactors(dds)
 ```
 
-Second, we remove the mean variance trend that is present in the data by one of the followinf procedures:
+Second, we remove the mean variance trend that is present in the data by one of the following procedures:
 
 * Variance stabilization using `varianceStabilizingTransformation` 
 ```{r, message=FALSE, warning=FALSE}
@@ -86,7 +86,7 @@ Once the mean-variance relationship was removed from the data, further filtering
 # Detailed use case
 Some detailed example of the pre-processing used in the MEFISTO application of the manuscript can be found here:
 
-* Log-transormation for spatial transcriptomics data is integrated in [our R tutorial on spatial transcriptomics data](https://raw.githack.com/bioFAM/MEFISTO_tutorials/master/MEFISTO_ST.html) or [in the corresponding Python tutorial](https://github.com/bioFAM/MEFISTO_tutorials/blob/master/MEFISTO_ST.ipynb)
+* Log-transformation for spatial transcriptomics data is integrated in [our R tutorial on spatial transcriptomics data](https://raw.githack.com/bioFAM/MEFISTO_tutorials/master/MEFISTO_ST.html) or [in the corresponding Python tutorial](https://github.com/bioFAM/MEFISTO_tutorials/blob/master/MEFISTO_ST.ipynb)
 * [variance stabiliation for RNA-seq data in the evodevo atlas](https://github.com/bioFAM/MEFISTO_analyses/blob/master/evodevo/preprocess_data.R)
 * [RCLR transformation for microbiome data](https://github.com/bioFAM/MEFISTO_analyses/blob/master/microbiome/preprocess_data.py)
 
